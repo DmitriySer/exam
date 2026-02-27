@@ -4,6 +4,173 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Панель администратора - Банкетам.Нет</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f8f9fa;
+        }
+        .header {
+            background: #343a40;
+            color: white;
+            padding: 15px 20px;
+            border-bottom: 3px solid #007bff;
+        }
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .logo-icon {
+            width: 30px;
+            height: 30px;
+            background: #007bff;
+            color: white;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        .container {
+            max-width: 800px;
+            margin: 40px auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .login-section {
+            padding: 40px;
+        }
+        .login-title {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #343a40;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #495057;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .btn-logout {
+            background: #dc3545;
+            width: auto;
+            padding: 8px 16px;
+        }
+        .btn-logout:hover {
+            background: #c82333;
+        }
+        .alert {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .dashboard-section {
+            padding: 20px;
+            display: none;
+        }
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .dashboard-content {
+            padding: 20px 0;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+            border-left: 4px solid #007bff;
+        }
+        .stat-card h4 {
+            margin-top: 0;
+            color: #343a40;
+        }
+        .stat-card p {
+            margin: 5px 0;
+            color: #6c757d;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            margin-top: 10px;
+        }
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            color: #6c757d;
+            font-size: 14px;
+        }
+    </style>
 </head>
 <body>
 <div class="header">
@@ -63,10 +230,8 @@
 </div>
 
 <script>
-    // Базовый URL API
     const API_BASE_URL = '/api';
 
-    // Элементы DOM
     const loginSection = document.getElementById('loginSection');
     const dashboardSection = document.getElementById('dashboardSection');
     const dashboardContent = document.getElementById('dashboardContent');
@@ -74,7 +239,6 @@
     const successAlert = document.getElementById('successAlert');
     const loginForm = document.getElementById('adminLoginForm');
 
-    // Проверяем, есть ли сохраненный токен
     document.addEventListener('DOMContentLoaded', function() {
         const token = localStorage.getItem('admin_token');
         if (token) {
@@ -82,14 +246,12 @@
         }
     });
 
-    // Обработка формы входа
     loginForm.addEventListener('submit', async function(e) {
         e.preventDefault();
 
         const login = document.getElementById('login').value;
         const password = document.getElementById('password').value;
 
-        // Скрываем предыдущие сообщения
         hideAlerts();
 
         try {
@@ -107,13 +269,11 @@
             const data = await response.json();
 
             if (data.success && data.token) {
-                // Сохраняем токен
                 localStorage.setItem('admin_token', data.token);
                 localStorage.setItem('admin_user', JSON.stringify(data.user));
 
                 showSuccess('Вход выполнен успешно!');
 
-                // Переключаем на панель управления
                 setTimeout(() => {
                     loginSection.style.display = 'none';
                     dashboardSection.style.display = 'block';
@@ -127,7 +287,6 @@
         }
     });
 
-    // Проверить доступ администратора по токену
     async function checkAdminAccess(token) {
         try {
             const response = await fetch(`${API_BASE_URL}/auth/check-admin?token=${token}`);
@@ -146,7 +305,6 @@
         }
     }
 
-    // Загрузить панель управления
     async function loadDashboard(token) {
         try {
             const userData = JSON.parse(localStorage.getItem('admin_user') || '{}');
@@ -164,23 +322,10 @@
                                 Управление пользователями
                             </button>
                         </div>
-
-                        <div class="stat-card">
-                            <h4>Заявки</h4>
-                            <p>Сегодня: <span id="todayRequests">0</span></p>
-                            <p>Всего: <span id="totalRequests">0</span></p>
-                        </div>
-
-                        <div class="stat-card">
-                            <h4>Система</h4>
-                            <p>Статус: Активна</p>
-                            <p>Версия: 1.0.0</p>
-                        </div>
                     </div>
                 </div>
             `;
 
-            // Загружаем статистику
             loadStatistics(token);
 
         } catch (error) {
@@ -193,7 +338,6 @@
         }
     }
 
-    // Загрузить статистику
     async function loadStatistics(token) {
         try {
             setTimeout(() => {
@@ -207,7 +351,6 @@
         }
     }
 
-    // Загрузить пользователей
     async function loadUsers() {
         dashboardContent.innerHTML = `
             <div>
@@ -219,18 +362,15 @@
             </div>
         `;
 
-        // Здесь реализуйте загрузку списка пользователей
         setTimeout(() => {
             document.getElementById('usersList').innerHTML = `
                 <div style="background: #f8f9fa; padding: 20px; border-radius: 4px;">
-                    <p>Функция управления пользователями находится в разработке</p>
-                    <p>В ближайшее время здесь появится возможность просматривать и управлять пользователями системы</p>
+                    <p>Метод не доделан нужно больше времени</p>
                 </div>
             `;
         }, 1000);
     }
 
-    // Выход
     function logout() {
         localStorage.removeItem('admin_token');
         localStorage.removeItem('admin_user');
@@ -245,7 +385,6 @@
         }, 1000);
     }
 
-    // Вспомогательные функции
     function showError(message) {
         errorAlert.textContent = message;
         errorAlert.style.display = 'block';

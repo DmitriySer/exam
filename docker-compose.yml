@@ -1,0 +1,67 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: ex_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: yii2advanced
+      MYSQL_USER: yii2user
+      MYSQL_PASSWORD: yii2password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ex_backend
+    expose:
+      - "9000"
+    volumes:
+      - ./backend:/var/www/html/backend
+    environment:
+      DB_HOST: db
+      DB_NAME: yii2advanced
+      DB_USER: yii2user
+      DB_PASSWORD: yii2password
+    depends_on:
+      - db
+    networks:
+      - net
+    working_dir: /var/www/html/backend
+    stdin_open: true
+    tty: true
+
+  ex_nginx:
+    image: nginx:alpine
+    container_name: ex_nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/conf.d/backend:/etc/nginx/conf.d
+      - ./backend:/var/www/html/backend
+    depends_on:
+      - backend
+    networks:
+      - net
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: ex_phpmyadmin
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+    ports:
+      - "8081:80"
+    networks:
+      - net
+volumes:
+  mysql_data:
+
+networks:
+  net:
+    driver: bridge

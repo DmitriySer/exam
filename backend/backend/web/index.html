@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Банкетам.Нет - Вход</title>
+</head>
+<body>
+<div class="container">
+    <h1>Банкетам.Нет</h1>
+
+    <div class="tabs">
+        <button class="tab active" onclick="showTab('login')">Вход</button>
+        <button class="tab" onclick="showTab('register')">Регистрация</button>
+    </div>
+
+    <form id="loginForm" class="form active" onsubmit="login(event)">
+        <div class="input-group">
+            <label for="loginEmail">Email или Логин:</label>
+            <input type="text" id="loginEmail" required>
+        </div>
+
+        <div class="input-group">
+            <label for="loginPassword">Пароль:</label>
+            <input type="password" id="loginPassword" required>
+        </div>
+
+        <button type="submit">Войти</button>
+
+        <div id="loginError" class="error"></div>
+        <div id="loginSuccess" class="success"></div>
+        <div id="loginLoading" class="loading">Вход...</div>
+    </form>
+
+    <form id="registerForm" class="form" onsubmit="register(event)">
+        <div class="input-group">
+            <label for="regUsername">Логин* (только латиница и цифры):</label>
+            <input type="text" id="regUsername" required>
+        </div>
+
+        <div class="input-group">
+            <label for="regEmail">Email*:</label>
+            <input type="email" id="regEmail" required>
+        </div>
+
+        <div class="input-group">
+            <label for="regPassword">Пароль*:</label>
+            <input type="password" id="regPassword" required>
+        </div>
+
+        <div class="input-group">
+            <label for="regFirstName">Имя*:</label>
+            <input type="text" id="regFirstName">
+        </div>
+
+        <div class="input-group">
+            <label for="regLastName">Фамилия*):</label>
+            <input type="text" id="regLastName">
+        </div>
+
+        <div class="input-group">
+            <label for="regPhone">Телефон*:</label>
+            <input type="tel" id="regPhone">
+        </div>
+
+        <button type="submit">Зарегистрироваться</button>
+
+        <div id="registerError" class="error"></div>
+        <div id="registerSuccess" class="success"></div>
+        <div id="registerLoading" class="loading">Регистрация...</div>
+    </form>
+</div>
+
+<script>
+    const API_BASE_URL = '/api';
+    const DASHBOARD_PAGE = 'dashboard.html';
+
+    document.addEventListener('DOMContentLoaded', function() {
+        checkTokenAndRedirect();
+    });
+
+    async function checkTokenAndRedirect() {
+        const token = localStorage.getItem('auth_token');
+
+        if (!token) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/auth/me`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    window.location.href = DASHBOARD_PAGE;
+                }
+            }
+        } catch (error) {
+            console.log('Ошибка проверки токена:', error);
+        }
+    }
+
+    function showTab(tabName) {
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        document.querySelectorAll('.form').forEach(form => {
+            form.classList.remove('active');
+        });
+
+        const activeTab = tabName === 'login' ? document.querySelector('.tab:nth-child(1)') :
+            document.querySelector('.tab:nth-child(2)');
+        activeTab.classList.add('active');
+
+        const activeForm = document.getElementById(tabName === 'login' ? 'loginForm' : 'registerForm');
+        activeForm.classList.add('active');
+
+        clearMessages();
+    }
+
+    async function login(event) {
+        event.preventDefault();
+
+        const loginEmail = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+
+        showLoading('login');
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    login: loginEmail,
+                    password: password
+                })
+            });
+
+            const data = await response.json();
+
+            hideLoading('login');
+
+            if (data.success && data.token) {
+                localStorage.setItem('auth_token', data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+
+                window.location.href = DASHBOARD_PAGE;
+            } else {
+                showError('login', data.message || 'Ошибка входа');
+            }
+        } catch (error) {
+            hideLoading('login');
+            showError('login', 'Ошибка сети или сервера');
+        }
+    }
+
+    async function register(event) {
+        event.preventDefault();
+
+        const username = document.getElementById('regUsername').value;
+        const email = document.getElementById('regEmail').value;
+        const password = document.getElementById('regPassword').value;
+        const firstName = document.getElementById('regFirstName').value;
+        const lastName = document.getElementById('regLastName').value;
+        const phone = document.getElementById('regPhone').value;
+
+        showLoading('register');
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/auth/register`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username: username,
+                    email: email,
+                    password: password,
+                    first_name: firstName,
+                    last_name: lastName,
+                    phone: phone
+                })
+            });
+
+            const data = await response.json();
+
+            hideLoading('register');
+
+            if (data.success && data.token) {
+                localStorage.setItem('auth_token', data.token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+
+                window.location.href = DASHBOARD_PAGE;
+            } else {
+                showError('register', data.message || 'Ошибка регистрации');
+            }
+        } catch (error) {
+            hideLoading('register');
+            showError('register', 'Ошибка сети или сервера');
+        }
+    }
+
+    function showError(form, message) {
+        const errorElement = document.getElementById(`${form}Error`);
+        errorElement.textContent = message;
+        errorElement.classList.add('show');
+        setTimeout(() => errorElement.classList.remove('show'), 5000);
+    }
+
+    function showSuccess(form, message) {
+        const successElement = document.getElementById(`${form}Success`);
+        successElement.textContent = message;
+        successElement.classList.add('show');
+        setTimeout(() => successElement.classList.remove('show'), 3000);
+    }
+
+    function showLoading(form) {
+        const loadingElement = document.getElementById(`${form}Loading`);
+        loadingElement.classList.add('show');
+
+        const submitButton = document.querySelector(`#${form}Form button[type="submit"]`);
+        submitButton.disabled = true;
+    }
+
+    function hideLoading(form) {
+        const loadingElement = document.getElementById(`${form}Loading`);
+        loadingElement.classList.remove('show');
+
+        const submitButton = document.querySelector(`#${form}Form button[type="submit"]`);
+        submitButton.disabled = false;
+    }
+
+    function clearMessages() {
+        document.querySelectorAll('.error, .success').forEach(el => {
+            el.classList.remove('show');
+            el.textContent = '';
+        });
+    }
+</script>
+</body>
+</html>

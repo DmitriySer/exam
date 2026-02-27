@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Банкетам.Нет - Панель управления</title>
+</head>
+<body>
+<div class="header">
+    <div class="header-content">
+        <h1>Банкетам.Нет</h1>
+        <div class="user-info">
+            <div class="avatar" id="userAvatar">U</div>
+            <div>
+                <div id="userName">Пользователь</div>
+                <small id="userEmail" style="color: #adb5bd;"></small>
+            </div>
+            <button class="logout-btn" onclick="logout()">Выйти</button>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="section">
+        <h2>Создать новую заявку</h2>
+
+        <div class="form-group">
+            <label for="datePicker">Дата заявки:*</label>
+            <input type="date" id="datePicker" required>
+        </div>
+
+        <div class="form-group">
+            <label for="timePicker">Время заявки:*</label>
+            <input type="time" id="timePicker" required>
+        </div>
+
+        <div class="form-group">
+            <label for="contactName">Контактное лицо:*</label>
+            <input type="text" id="contactName" required placeholder="ФИО контактного лица">
+        </div>
+
+        <div class="form-group">
+            <label for="contactPhone">Контактный телефон:*</label>
+            <input type="tel" id="contactPhone" required placeholder="+7 (XXX) XXX-XX-XX">
+        </div>
+
+        <div class="form-group">
+            <label for="requestType">Тип заявки:</label>
+            <select id="requestType">
+                <option value="standard">Стандартная</option>
+                <option value="urgent">Срочная</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="specialRequests">Особые пожелания:</label>
+            <textarea id="specialRequests" placeholder="Дополнительные требования или пожелания..."></textarea>
+        </div>
+
+        <div class="action-buttons">
+            <button onclick="createRequest()">Отправить заявку</button>
+            <button class="btn-secondary" onclick="clearForm()">Очистить форму</button>
+        </div>
+
+        <div id="requestResult"></div>
+    </div>
+
+    <div class="section">
+        <h2>Мои заявки</h2>
+        <button onclick="loadReservations()" class="btn-secondary">Обновить список</button>
+        <div id="reservationsList" style="margin-top: 20px;">
+            <div class="loading">Загрузка заявок...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_BASE_URL = '/api';
+    const LOGIN_PAGE = 'index.html';
+
+    let userData = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        checkAuth();
+        setupDateTimePicker();
+    });
+
+    function setupDateTimePicker() {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('datePicker').min = today;
+    }
+
+    async function checkAuth() {
+        const token = localStorage.getItem('auth_token');
+        const storedUser = localStorage.getItem('user');
+
+        if (!token || !storedUser) {
+            window.location.href = LOGIN_PAGE;
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/auth/me`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                window.location.href = LOGIN_PAGE;
+                return;
+            }
+
+            const data = await response.json();
+            if (!data.success) {
+                window.location.href = LOGIN_PAGE;
+                return;
+            }
+
+            userData = data.user;
+            displayUserInfo();
+            loadReservations();
+        } catch (error) {
+            console.error('Ошибка проверки авторизации:', error);
+            window.location.href = LOGIN_PAGE;
+        }
+    }
+
+    function displayUserInfo() {
+        if (userData) {
+            document.getElementById('userName').textContent =
+                userData.first_name || userData.username || 'Пользователь';
+            document.getElementById('userEmail').textContent = userData.email || '';
+
+            const avatar = document.getElementById('userAvatar');
+            const firstName = userData.first_name || userData.username || 'U';
+            avatar.textContent = firstName.charAt(0).toUpperCase();
+        }
+    }
+
+    async function createRequest() {
+        const date = document.getElementById('datePicker').value;
+        const time = document.getElementById('timePicker').value;
+        const requestType = document.getElementById('requestType').value;
+        const specialRequests = document.getElementById('specialRequests').value;
+        const contactName = document.getElementById('contactName').value;
+        const contactPhone = document.getElementById('contactPhone').value;
+
+        if (!date || !time || !contactName || !contactPhone) {
+            showResult('Пожалуйста, заполните все обязательные поля', 'error');
+            return;
+        }
+
+        showResult('Отправка заявки...', 'loading');
+
+        try {
+            const token = localStorage.getItem('auth_token');
+
+            const requestData = {
+                request_date: date,
+                request_time: time,
+                contact_name: contactName,
+                contact_phone: contactPhone,
+                request_type: requestType,
+                special_requests: specialRequests
+            };
+
+            const response = await fetch('/api/requests', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showResult('Заявка успешно создана! Номер заявки: #' + data.data.id, 'success');
+                clearForm();
+                loadReservations();
+            } else {
+                showResult(data.message || 'Ошибка при создании заявки', 'error');
+            }
+        } catch (error) {
+            console.error('Ошибка сети:', error);
+            showResult('Ошибка соединения с сервером', 'error');
+        }
+    }
+
+    // Функция для показа результатов
+    function showResult(message, type) {
+        const resultDiv = document.getElementById('requestResult');
+
+        resultDiv.innerHTML = '';
+        if (type === 'error') {
+            resultDiv.innerHTML = `<div class="error">${message}</div>`;
+        } else if (type === 'success') {
+            resultDiv.innerHTML = `<div class="success">${message}</div>`;
+        } else {
+            resultDiv.innerHTML = `<div>${message}</div>`;
+        }
+    }
+
+    // Очистка формы
+    function clearForm() {
+        document.getElementById('datePicker').value = '';
+        document.getElementById('timePicker').value = '';
+        document.getElementById('contactName').value = '';
+        document.getElementById('contactPhone').value = '';
+        document.getElementById('requestType').value = 'standard';
+        document.getElementById('specialRequests').value = '';
+        document.getElementById('requestResult').innerHTML = '';
+    }
+
+    // Загрузка списка заявок пользователя
+    async function loadReservations() {
+        const list = document.getElementById('reservationsList');
+        list.innerHTML = '<div>Загрузка...</div>';
+
+        try {
+            const token = localStorage.getItem('auth_token');
+            const res = await fetch('/api/requests', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const data = await res.json();
+            if (!data.success) throw new Error();
+
+            renderReservations(data.data);
+        } catch {
+            list.innerHTML = '<div class="error">Ошибка загрузки заявок</div>';
+        }
+    }
+
+    function renderReservations(items) {
+        const list = document.getElementById('reservationsList');
+        list.innerHTML = '';
+
+        if (!items.length) {
+            list.innerHTML = '<div class="empty-state">Нет созданных заявок</div>';
+            return;
+        }
+
+        items.forEach(r => {
+            const div = document.createElement('div');
+            div.className = 'request-item';
+
+            div.innerHTML = `
+                <div class="request-header">
+                    <div class="request-date">${r.request_date} ${r.request_time.slice(0,5)}</div>
+                    <div class="request-status status-${r.status}">${formatStatus(r.status)}</div>
+                </div>
+                <div class="request-info">
+                    <div><strong>Контактное лицо:</strong> ${r.contact_name}</div>
+                    <div><strong>Телефон:</strong> ${r.contact_phone}</div>
+                    <div><strong>Тип заявки:</strong> ${formatRequestType(r.request_type)}</div>
+                    ${r.special_requests ? `<div><strong>Пожелания:</strong> ${r.special_requests}</div>` : ''}
+                </div>
+                ${r.can_cancel ? `
+                    <div class="action-buttons">
+                        <button class="btn-danger" onclick="cancelReservation(${r.id})">Отменить заявку</button>
+                    </div>
+                ` : ''}
+            `;
+
+            list.appendChild(div);
+        });
+    }
+
+    function formatStatus(s) {
+        const statusMap = {
+            pending: 'Ожидание',
+            confirmed: 'Подтверждено',
+            canceled: 'Отменено',
+            completed: 'Завершено'
+        };
+        return statusMap[s] || s;
+    }
+
+    function formatRequestType(t) {
+        const typeMap = {
+            standard: 'Стандартная',
+            urgent: 'Срочная',
+            vip: 'VIP',
+            group: 'Групповая'
+        };
+        return typeMap[t] || t;
+    }
+
+    // Отмена заявки
+    async function cancelReservation(reservationId) {
+        if (!confirm('Вы уверены, что хотите отменить эту заявку?')) return;
+
+        try {
+            const token = localStorage.getItem('auth_token');
+
+            const response = await fetch(`${API_BASE_URL}/requests/${reservationId}/cancel`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                alert('Заявка успешно отменена');
+                loadReservations();
+            } else {
+                alert(data.message || 'Ошибка отмены заявки');
+            }
+        } catch (error) {
+            alert('Ошибка соединения с сервером');
+        }
+    }
+
+    function logout() {
+        if (confirm('Вы действительно хотите выйти?')) {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user');
+            window.location.href = LOGIN_PAGE;
+        }
+    }
+</script>
+</body>
+</html>

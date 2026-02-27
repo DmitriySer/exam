@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель администратора - Банкетам.Нет</title>
+</head>
+<body>
+<div class="header">
+    <div class="header-content">
+        <div class="logo">
+            <div class="logo-icon">А</div>
+            <h1>Панель администратора - Банкетам.Нет</h1>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="login-section" id="loginSection">
+        <h2 class="login-title">Вход в панель управления</h2>
+
+        <div class="alert alert-error" id="errorAlert"></div>
+        <div class="alert alert-success" id="successAlert"></div>
+
+        <form id="adminLoginForm">
+            <div class="form-group">
+                <label for="login">Логин или Email:</label>
+                <input type="text"
+                       id="login"
+                       name="login"
+                       required
+                       placeholder="Введите ваш логин или email">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Пароль:</label>
+                <input type="password"
+                       id="password"
+                       name="password"
+                       required
+                       placeholder="Введите ваш пароль">
+            </div>
+
+            <button type="submit">Войти как администратор</button>
+        </form>
+
+        <div class="footer">
+            <p>Доступ только для авторизованных администраторов</p>
+            <p>Версия 1.0.0</p>
+        </div>
+    </div>
+
+    <div class="dashboard-section" id="dashboardSection">
+        <div class="dashboard-header">
+            <h2>Панель управления</h2>
+            <button class="btn-logout" onclick="logout()">Выйти</button>
+        </div>
+
+        <div class="dashboard-content" id="dashboardContent">
+            <div class="loading">Загрузка панели управления...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Базовый URL API
+    const API_BASE_URL = '/api';
+
+    // Элементы DOM
+    const loginSection = document.getElementById('loginSection');
+    const dashboardSection = document.getElementById('dashboardSection');
+    const dashboardContent = document.getElementById('dashboardContent');
+    const errorAlert = document.getElementById('errorAlert');
+    const successAlert = document.getElementById('successAlert');
+    const loginForm = document.getElementById('adminLoginForm');
+
+    // Проверяем, есть ли сохраненный токен
+    document.addEventListener('DOMContentLoaded', function() {
+        const token = localStorage.getItem('admin_token');
+        if (token) {
+            checkAdminAccess(token);
+        }
+    });
+
+    // Обработка формы входа
+    loginForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const login = document.getElementById('login').value;
+        const password = document.getElementById('password').value;
+
+        // Скрываем предыдущие сообщения
+        hideAlerts();
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/auth/admin-login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    login: login,
+                    password: password
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success && data.token) {
+                // Сохраняем токен
+                localStorage.setItem('admin_token', data.token);
+                localStorage.setItem('admin_user', JSON.stringify(data.user));
+
+                showSuccess('Вход выполнен успешно!');
+
+                // Переключаем на панель управления
+                setTimeout(() => {
+                    loginSection.style.display = 'none';
+                    dashboardSection.style.display = 'block';
+                    loadDashboard(data.token);
+                }, 1000);
+            } else {
+                showError(data.message || 'Ошибка входа');
+            }
+        } catch (error) {
+            showError('Ошибка сети или сервера');
+        }
+    });
+
+    // Проверить доступ администратора по токену
+    async function checkAdminAccess(token) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/auth/check-admin?token=${token}`);
+            const data = await response.json();
+
+            if (data.success && data.has_access) {
+                loginSection.style.display = 'none';
+                dashboardSection.style.display = 'block';
+                loadDashboard(token);
+            } else {
+                localStorage.removeItem('admin_token');
+                localStorage.removeItem('admin_user');
+            }
+        } catch (error) {
+            console.error('Ошибка проверки доступа:', error);
+        }
+    }
+
+    // Загрузить панель управления
+    async function loadDashboard(token) {
+        try {
+            const userData = JSON.parse(localStorage.getItem('admin_user') || '{}');
+
+            dashboardContent.innerHTML = `
+                <div>
+                    <h3>Добро пожаловать, ${userData.username || 'Администратор'}!</h3>
+                    <p>Email: ${userData.email || 'Не указан'}</p>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h4>Пользователи</h4>
+                            <p id="usersCount">Загрузка...</p>
+                            <button onclick="loadUsers()" class="btn-secondary">
+                                Управление пользователями
+                            </button>
+                        </div>
+
+                        <div class="stat-card">
+                            <h4>Заявки</h4>
+                            <p>Сегодня: <span id="todayRequests">0</span></p>
+                            <p>Всего: <span id="totalRequests">0</span></p>
+                        </div>
+
+                        <div class="stat-card">
+                            <h4>Система</h4>
+                            <p>Статус: Активна</p>
+                            <p>Версия: 1.0.0</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Загружаем статистику
+            loadStatistics(token);
+
+        } catch (error) {
+            dashboardContent.innerHTML = `
+                <div style="color: #dc3545;">
+                    <h3>Ошибка загрузки панели управления</h3>
+                    <p>${error.message}</p>
+                </div>
+            `;
+        }
+    }
+
+    // Загрузить статистику
+    async function loadStatistics(token) {
+        try {
+            setTimeout(() => {
+                document.getElementById('usersCount').textContent = 'Всего: ^%^';
+                document.getElementById('todayRequests').textContent = '0';
+                document.getElementById('totalRequests').textContent = '111';
+            }, 500);
+
+        } catch (error) {
+            console.error('Ошибка загрузки статистики:', error);
+        }
+    }
+
+    // Загрузить пользователей
+    async function loadUsers() {
+        dashboardContent.innerHTML = `
+            <div>
+                <h3>Управление пользователями</h3>
+                <div id="usersList" class="loading">Загрузка списка пользователей...</div>
+                <button onclick="loadDashboard(localStorage.getItem('admin_token'))" class="btn-secondary" style="margin-top: 20px;">
+                    Вернуться на главную
+                </button>
+            </div>
+        `;
+
+        // Здесь реализуйте загрузку списка пользователей
+        setTimeout(() => {
+            document.getElementById('usersList').innerHTML = `
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 4px;">
+                    <p>Функция управления пользователями находится в разработке</p>
+                    <p>В ближайшее время здесь появится возможность просматривать и управлять пользователями системы</p>
+                </div>
+            `;
+        }, 1000);
+    }
+
+    // Выход
+    function logout() {
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('admin_user');
+
+        showSuccess('Вы успешно вышли из системы');
+
+        setTimeout(() => {
+            dashboardSection.style.display = 'none';
+            loginSection.style.display = 'block';
+            hideAlerts();
+            loginForm.reset();
+        }, 1000);
+    }
+
+    // Вспомогательные функции
+    function showError(message) {
+        errorAlert.textContent = message;
+        errorAlert.style.display = 'block';
+    }
+
+    function showSuccess(message) {
+        successAlert.textContent = message;
+        successAlert.style.display = 'block';
+    }
+
+    function hideAlerts() {
+        errorAlert.style.display = 'none';
+        successAlert.style.display = 'none';
+    }
+</script>
+</body>
+</html>
